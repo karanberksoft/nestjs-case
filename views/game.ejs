@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <title><%= title %></title>
+    <script src="/socket.io/socket.io.js"></script>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+      }
+      .question {
+        margin: 20px;
+      }
+      .option {
+        display: block;
+        margin: 10px 0;
+        padding: 8px 12px;
+        cursor: pointer;
+      }
+      #score {
+        font-size: 1.2em;
+        margin: 10px;
+      }
+      #startTest {
+        padding: 10px 20px;
+        font-size: 1em;
+        cursor: pointer;
+      }
+    </style>
+  </head>
+  <body>
+    <h1><%= title %></h1>
+    
+    <button id="startTest">Test'e Başla</button>
+    
+    <div id="score" style="display: none;">Score: 0</div>
+    <div class="question" id="questionContainer" style="display: none;">
+      <p id="questionText"></p>
+      <div id="options"></div>
+    </div>
+
+    <script>
+      const socket = io();
+      let currentScore = 0;
+      let currentQuestionId = null;
+      let nextQuestionTimer = null;
+
+     
+      function getQuestion() {
+        socket.emit('getQuestion');
+      }
+
+     
+      socket.on('question', function (question) {
+        
+        if (nextQuestionTimer) {
+          clearTimeout(nextQuestionTimer);
+        }
+        currentQuestionId = question.id;
+        document.getElementById('questionText').innerText = question.text;
+        const optionsDiv = document.getElementById('options');
+        optionsDiv.innerHTML = '';
+        question.options.forEach(option => {
+          const btn = document.createElement('button');
+          btn.className = 'option';
+          btn.innerText = option;
+          btn.addEventListener('click', () => {
+            submitAnswer(option);
+          });
+          optionsDiv.appendChild(btn);
+        });
+      });
+
+      
+      function submitAnswer(answer) {
+        socket.emit('submitAnswer', {
+          questionId: currentQuestionId,
+          answer: answer,
+          currentScore: currentScore,
+        });
+      }
+
+
+      socket.on('answerResult', function (data) {
+        if (data.isCorrect) {
+          alert('Correct!');
+        } else {
+          alert('Wrong answer.');
+        }
+        currentScore = data.newScore;
+        document.getElementById('score').innerText = 'Score: ' + currentScore;
+        
+        nextQuestionTimer = setTimeout(getQuestion, 1000);
+      });
+
+      
+      socket.on('gameFinished', function (data) {
+        
+        if (nextQuestionTimer) {
+          clearTimeout(nextQuestionTimer);
+        }
+        document.getElementById('questionContainer').innerHTML =
+          '<h2>' + data.message + '</h2>';
+      });
+
+      socket.on('error', function (error) {
+        console.error(error.message);
+      });
+
+      
+      document.getElementById('startTest').addEventListener('click', function() {
+        
+        document.getElementById('startTest').style.display = 'none';
+        
+        document.getElementById('score').style.display = 'block';
+        document.getElementById('questionContainer').style.display = 'block';
+        
+        getQuestion();
+      });
+    </script>
+  </body>
+</html>
